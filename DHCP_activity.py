@@ -42,13 +42,14 @@ class DHCPAnalysis:
         bins_array = np.array(bins)
         num_events = np.zeros(bins.size)
         for index, row in self.traces.iterrows():
-            start_time = row['startTime'].to_datetime64()
-            end_time = row['endTime'].to_datetime64()
-            num_bins = math.floor((end_time - start_time) / (minutes * 60 * 1e9)) + 1
-            start_index = np.searchsorted(bins_array, start_time, side='right') - 1
-            for hist_index in range(start_index, start_index + num_bins):
-                hist_index = min(hist_index, num_events.size - 1)
-                num_events[hist_index] += 1
+            if re.match('b(\d{3,4}).*', row['APNAME']):
+                start_time = row['startTime'].to_datetime64()
+                end_time = row['endTime'].to_datetime64()
+                num_bins = math.floor((end_time - start_time) / (minutes * 60 * 1e9)) + 1
+                start_index = np.searchsorted(bins_array, start_time, side='right') - 1
+                for hist_index in range(start_index, start_index + num_bins):
+                    hist_index = min(hist_index, num_events.size - 1)
+                    num_events[hist_index] += 1
         bins = self.get_strings_from_dates(bins)
         return num_events, bins
         
@@ -167,7 +168,6 @@ if __name__ == "__main__":
 #    minutes = [5]
     dpi = 96
 
-    '''
     if (ntpath.isfile(style_file)):
         plt.style.use(style_file)
     
@@ -181,8 +181,8 @@ if __name__ == "__main__":
             fig2.savefig("{0}_{1}min_periods".format(analysis_20120407.get_day_from_file_name(), minute), dpi=dpi)
     else:
         print('Error: File {0} does not exist'.format(data_file))
-    '''
 
+    '''
     import matplotlib.pyplot as plt
 
     # Pie chart, where the slices will be ordered and plotted counter-clockwise:
@@ -193,3 +193,4 @@ if __name__ == "__main__":
         shadow=True, startangle=90)
     ax1.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
     plt.show()
+    '''
