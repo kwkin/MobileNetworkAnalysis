@@ -166,7 +166,8 @@ if __name__ == "__main__":
     minutes = [1, 5, 10, 15, 30, 60]
 #    minutes = [5]
     dpi = 96
-    
+
+    '''
     if (ntpath.isfile(style_file)):
         plt.style.use(style_file)
     
@@ -180,4 +181,15 @@ if __name__ == "__main__":
             fig2.savefig("{0}_{1}min_periods".format(analysis_20120407.get_day_from_file_name(), minute), dpi=dpi)
     else:
         print('Error: File {0} does not exist'.format(data_file))
-    
+    '''
+
+    import matplotlib.pyplot as plt
+
+    # Pie chart, where the slices will be ordered and plotted counter-clockwise:
+    labels = 'Early-birds', 'Munchers', 'Stompers', 'Others'
+    sizes = [20, 30, 45, 10]
+    fig1, ax1 = plt.subplots()
+    ax1.pie(sizes, explode=None, labels=labels, autopct='%1.1f%%',
+        shadow=True, startangle=90)
+    ax1.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
+    plt.show()
