@@ -160,7 +160,7 @@ class DHCPAnalysis:
         return day_and_date
         
 if __name__ == "__main__":
-    style_file = 'simple_charts.mplstyle'
+    style_file = '../style/simple_charts.mplstyle'
 #    data_file = '../data/outputwireless-logs-20120407.DHCP_ANON.csv'
     data_file = '../data/outputwireless-logs-20120409.DHCP_ANON.csv'
 #    data_file = '../data/sample_20120407.csv'

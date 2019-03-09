@@ -68,4 +68,6 @@ grid.color          : cdcdcd
 figure.subplot.left : 0.08
 figure.subplot.right: 0.95
 figure.subplot.bottom: 0.07
+figure.subplot.wspace  : 0.05
+figure.subplot.hspace  : 0.15
 figure.facecolor    : ffffff
