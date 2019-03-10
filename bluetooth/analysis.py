@@ -1,4 +1,5 @@
 import numpy as np
+import datetime as dt
 import matplotlib.pyplot as plt
 import ntpath
 import pandas as pd
@@ -51,3 +52,39 @@ class BluetoothAnalysis:
 
     def get_rssi_average_data(self, data):
         return data['rssi'].mean()
+
+    def get_datetimes(self):
+        return self.get_datetimes_data(self.data)
+        
+    def get_datetimes_data(self, data):
+        """
+        Converts the timestamp volumn to an array of pandas datetimes
+        """
+        datetimes_utc = pd.to_datetime(data['timestamp'], unit='s')
+        datetimes_est = []
+        for datetime_utc in datetimes_utc:
+            datetimes_est.append(datetime_utc.tz_localize('UTC').tz_convert('US/Eastern'))
+        return datetimes_est
+       
+    def get_strings_from_dates(self, dates):
+        strings = []
+        for index in range(len(dates)):
+            ts = dates[index]
+            date_str = dt.datetime(ts.year, ts.month, ts.day, ts.hour, ts.minute, ts.second).strftime('%H:%M:%S')
+            strings.append(date_str)
+        return strings
+
+    def get_averaged_rssi(self):
+        return self.get_averaged_rssi_data(self.data)
+    
+    def get_averaged_rssi_data(self, data):
+        """
+        Averages the rssi data for all similar timestamps
+        """
+        times = data['timestamp'].unique()
+        average_rssi = []
+        for time in times:
+            rows_at_time = data[data['timestamp'] == time]
+            rssi_values = rows_at_time['rssi']
+            average_rssi.append(rssi_values.mean())
+        return np.array(average_rssi), np.array(times)

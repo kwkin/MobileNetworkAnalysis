@@ -1,5 +1,6 @@
 from analysis import BluetoothAnalysis
 from sklearn.metrics import mean_absolute_error
+from pynverse import inversefunc
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -139,11 +140,11 @@ def fit_line():
         records = analysis_poco.get_name_traces_data(device_name_poco, records)
         means_poco.append(analysis_poco.get_rssi_average_data(records))
 
-    fit_model(distances, means_s8, device_name_s8)
-    fit_model(distances, means_poco, device_name_poco)
-    fit_average_model(distances, means_s8, means_poco)
+    s8_model = fit_model(distances, means_s8, device_name_s8)
+    poco_model = fit_model(distances, means_poco, device_name_poco)
+    average_model = fit_average_model(distances, means_s8, means_poco)
 
-    plt.show(block=True)
+    return s8_model, poco_model, average_model
 
 def fit_model(distances, mean, device):
     z = np.polyfit(distances, mean, 3)
@@ -161,6 +162,7 @@ def fit_model(distances, mean, device):
     ax.set_ylabel('RSSI')
     ax.legend(legend)
     print('Model for the {0}: \n{1}'.format(device, model))
+    return model
  
 def fit_average_model(distances, mean_1, mean_2):
     all_means = np.mean( np.array([ mean_1, mean_2 ]), axis=0 )
@@ -180,6 +182,7 @@ def fit_average_model(distances, mean_1, mean_2):
     ax.set_ylabel('RSSI')
     ax.legend(legend)
     print('General Model: \n{0}'.format(model))
+    return model
 
 def plot_rssi(data_files, record_files, device_name):
     distances = [0.5, 1, 5, 10, 20, 25, 30]
@@ -221,6 +224,7 @@ def plot_rssi(data_files, record_files, device_name):
 
         # Generate log shadowing models for error plotting
         log_shadowing_values = compute_log_shadowing(distances, means[1])
+        print("Means: {0}".format(means[1]))
 
         truths = []
         actuals = []
@@ -268,10 +272,164 @@ def compute_log_shadowing(distances, mean):
         values.append(-10 * n * math.log10(distance) + mean)
     return values
 
+def compute_log_shadowing_distances(rssis, mean):
+    n = 2
+    value = 10**((rssis - mean) / -10 * n)
+    return value
+
+def scenario_prediction_1(model_1, model_2):
+    # Scenario part 4 1
+    data_file_classic = "../data/bluetooth_part4/BluetoothDataClassicPart4_1.txt"
+    record_file_classic = "../data/bluetooth_part4/recordClassicPart4_1.txt"
+    data_files_ble = "../data/bluetooth_part4/BluetoothDataBlePart4_1.txt"
+    record_files_ble = "../data/bluetooth_part4/recordBlePart4_1.txt"
+    scenario = 1
+    scenario_prediction(data_file_classic, record_file_classic, data_files_ble, record_files_ble, 1, model_1, model_2)
+
+
+def scenario_prediction_2(model_1, model_2):
+    # Scenario part 4 2
+    data_file_classic = "../data/bluetooth_part4/BluetoothDataClassicPart4_2.txt"
+    record_file_classic = "../data/bluetooth_part4/recordClassicPart4_2.txt"
+    data_files_ble = "../data/bluetooth_part4/BluetoothDataBlePart4_2.txt"
+    record_files_ble = "../data/bluetooth_part4/recordBlePart4_2.txt"
+    scenario = 2
+    scenario_prediction(data_file_classic, record_file_classic, data_files_ble, record_files_ble, 2, model_1, model_2)
+
+
+def scenario_prediction(classic_data, classic_record, ble_data, ble_record, title, model_1, model_2):
+    # Classic Analysis
+    device_name = 'Pocophone F1'
+
+    analysis = BluetoothAnalysis(classic_data, classic_record, True)
+
+    max_time_difference = 0
+    largest_value = -100
+    smallest_value = 0
+    for session in analysis.records['session']:
+        records = analysis.get_session_traces(session)
+        records = analysis.get_name_traces_data(device_name, records)
+        
+        rssi, times = analysis.get_averaged_rssi_data(records)
+        largest_value = max(np.max(records['rssi']), largest_value)
+        smallest_value = min(np.min(records['rssi']), smallest_value)
+        min_time = np.min(records['timestamp'])
+        max_time = np.max(records['timestamp'])
+        classic_rssi = rssi
+        classic_times = times - min_time
+        time_difference = max_time - min_time
+        max_time_difference = max(time_difference, max_time_difference)
+    
+    # BLE Analysis
+    analysis = BluetoothAnalysis(ble_data, ble_record, False)
+
+    ble_rssis = []
+    ble_times = []
+    for session in analysis.records['session']:
+        records = analysis.get_session_traces(session)
+        records = analysis.get_name_traces_data(device_name, records)
+
+        rssi, times = analysis.get_averaged_rssi_data(records)
+        largest_value = max(np.max(records['rssi']), largest_value)
+        smallest_value = min(np.min(records['rssi']), smallest_value)
+        min_time = np.min(records['timestamp'])
+        max_time = np.max(records['timestamp'])
+        ble_rssis.append(rssi)
+        ble_times.append(times - min_time)
+        time_difference = max_time - min_time
+        max_time_difference = max(time_difference, max_time_difference)
+
+    fig_rssi, ax_rssi = plt.subplots(1, 1)
+    plt.gcf().subplots_adjust(bottom=0.15, left=0.1)
+    ax_rssi.set_xlabel('Time (seconds)')
+    ax_rssi.set_ylabel('RSSI')
+    if (title == 1):
+        fig_rssi.suptitle('RSSI Analysis without Stopping')
+    else:        
+        fig_rssi.suptitle('RSSI Analysis when Stopping for 1 Minute')
+
+    # Classic plot
+    plt.plot(classic_times, classic_rssi, marker='o')
+
+    # BLE plots
+    for ble_rssi, ble_time in zip(ble_rssis, ble_times):
+        plt.plot(ble_time, ble_rssi, marker='o')
+
+    ax_rssi.set_ylim([math.ceil(smallest_value * 1.05), largest_value * 0.95])
+    ax_rssi.legend(['Classic', 'Ultra Low', 'Low', 'Medium', 'High'])
+
+    # Now calculate distances using model 1
+    fig_dist_1, ax_dist_1 = plt.subplots(1, 1)
+    plt.gcf().subplots_adjust(bottom=0.15, left=0.1)
+    ax_dist_1.set_xlabel('Time (seconds)')
+    ax_dist_1.set_ylabel('Distance (meters)')
+    if (title == 1):
+        fig_dist_1.suptitle("Estimated Distance using the General Model (Scenario #1)")
+    else:        
+        fig_dist_1.suptitle("Estimated Distance using the General Model (Scenario #2)")
+
+    min_distance = 100
+    for ble_rssi, ble_time in zip(ble_rssis, ble_times):
+        distances = model_1(ble_rssi)
+        min_distance = min(distances)
+        plt.plot(ble_time, distances, marker='o')
+
+    ax_dist_1.set_ylim(min_distance * 1.05, 17)
+    ax_dist_1.legend(['Ultra Low', 'Low', 'Medium', 'High'])
+    
+    # Now calculate distances using model 2
+    fig_dist_2, ax_dist_2 = plt.subplots(1, 1)
+    plt.gcf().subplots_adjust(bottom=0.15, left=0.1)
+    ax_dist_2.set_xlabel('Time (seconds)')
+    ax_dist_2.set_ylabel('Distance (meters)')
+    if (title == 1):
+        fig_dist_2.suptitle("Estimated Distance using the Pocophone Model (Scenario #1)")
+    else:        
+        fig_dist_2.suptitle("Estimated Distance using the Pocophone Model (Scenario #2)")
+
+    min_distance = 100
+    for ble_rssi, ble_time in zip(ble_rssis, ble_times):
+        distances = model_2(ble_rssi)
+        min_distance = min(distances)
+        plt.plot(ble_time, distances, marker='o')
+
+    ax_dist_2.set_ylim(min_distance * 1.05, 17)
+    ax_dist_2.legend(['Ultra Low', 'Low', 'Medium', 'High'])
+    
+    # Now calculate distances using log shadow model
+    fig_dist_3, ax_dist_3 = plt.subplots(1, 1)
+    plt.gcf().subplots_adjust(bottom=0.15, left=0.1)
+    ax_dist_3.set_xlabel('Time (seconds)')
+    ax_dist_3.set_ylabel('Distance (meters)')
+    if (title == 1):
+        fig_dist_3.suptitle("Estimated Distance using the Log Shadowing Model (Scenario #1)")
+    else:        
+        fig_dist_3.suptitle("Estimated Distance using the Log Shadowing Model (Scenario #2)")
+
+    min_distance = 100
+
+    # Hardcoded means calculated in previous parts
+    means = [-94.11111111111111, -83.75, -87.96078431372548, -84.31111111111112]
+    for ble_rssi, ble_time, mean in zip(ble_rssis, ble_times, means):
+        distances = compute_log_shadowing_distances(ble_rssi, mean)
+        min_distance = min(distances)
+        plt.plot(ble_time, distances, marker='o')
+
+    distances = compute_log_shadowing_distances(classic_rssi, -58.6)
+    plt.plot(classic_times, distances, marker='o')
+
+    ax_dist_3.set_ylim(min_distance * 1.05, 20)
+    ax_dist_3.legend(['Ultra Low', 'Low', 'Medium', 'High'])
+
 if __name__ == "__main__":
     style_file = '../style/simple_charts.mplstyle'
     if (ntpath.isfile(style_file)):
         plt.style.use(style_file)
 
-    # plot_device_distances()
-    fit_line()
+    galaxy_s8, poco_phone, general_model = fit_line()
+    inverse_general = inversefunc(general_model)
+    inverse_poco = inversefunc(poco_phone)
+    scenario_prediction_1(inverse_general, inverse_poco)
+    scenario_prediction_2(inverse_general, inverse_poco)
+    
+    plt.show(block=True)
