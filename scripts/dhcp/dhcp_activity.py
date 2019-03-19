@@ -100,14 +100,22 @@ class DHCPAnalysis:
         for index, row in user_traces.iterrows():
             prefix = re.findall('[a-zA-Z]+', row['APNAME'])[0]
             location = locations.loc[locations['prefix'] == prefix]
-            building = location['name'].values[0]
+            if (location.size > 0):
+                building = location['name'].values[0]
+            else:
+                building = None
+
             if (index == user_traces.values.size - 1):
                 trip.append(Visit(building=previous_building, lat=previous_lat, lon=previous_lon, duration=current_duration))
             elif (previous_building != building):
                 # Add visit as a new location if it does not match previous prefix
                 previous_building = building
-                previous_lat = location['lat'].values[0]
-                previous_lon = location['lon'].values[0]
+                if (location.size > 0):
+                    previous_lat = location['lat'].values[0]
+                    previous_lon = location['lon'].values[0]
+                else:
+                    previous_lat = None
+                    previous_lon = None
                 current_duration = row['endTime'] - row['startTime']
                 trip.append(Visit(building=previous_building, lat=previous_lat, lon=previous_lon, duration=current_duration))
             else:

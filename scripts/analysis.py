@@ -11,7 +11,7 @@ if __name__ == "__main__":
     categories = analysis.get_categories(1)
     fav_building = loc.LocationsAnalysis.get_favorite(buildings)
     fav_category = loc.LocationsAnalysis.get_favorite(categories)    
-    trip = analysis.get_trip(1)
-    for location in trip:
-        print(location)
+    trip = analysis.get_trip(600)
+    for index, location in zip(range(len(trip)), trip):
+        print("{0}: {1}".format(index, location))
         print()
