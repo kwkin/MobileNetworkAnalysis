@@ -19,6 +19,30 @@ class DHCPAnalysis:
         self.traces = pd.read_csv(dhcp_file)
         self.locations = pd.read_csv(location_file)
     
+    def get_num_events(self, minutes):
+        return DHCPAnalysis.get_trace_num_events(self.traces, minutes)
+        
+    @staticmethod
+    def get_trace_num_events(traces, minutes):
+        seconds = minutes * 60.0
+        earliest_time = traces['startTime'].min()
+        latest_time = traces['endTime'].max()
+        num_periods = math.floor((latest_time - earliest_time) / seconds) + 1
+        bins = range(0, num_periods)
+        num_events = np.zeros(len(bins))
+
+        for index, row in traces.iterrows():
+            start_time = row['startTime']
+            end_time = row['endTime']
+            num_affected_bins = math.floor((end_time - start_time) / (seconds)) + 1
+            start_bin = math.floor((start_time - earliest_time) * minutes / 60)
+            # print("end: {0} start: {1} num: {2}".format(end_time, start_time, num_periods))
+            for bin_index in range(start_bin, start_bin + num_affected_bins):
+                bin_index = min(bin_index, len(bins) - 1)
+                num_events[bin_index] += 1
+        return num_events, bins
+
+
     def get_user_events(self, user_id):
         return DHCPAnalysis.get_trace_user_events(self.traces, user_id)
     
