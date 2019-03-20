@@ -8,7 +8,7 @@ from colour import Color
 import gmplot
 
 if __name__ == "__main__":
-    dhcp_file = "data/dhcp/outputwireless-logs-20120409.DHCP_ANON.csv"
+    dhcp_file = "data/dhcp/outputwireless-logs-20120407.DHCP_ANON.csv"
     location_file = "data/prefix_lat_lon_name_category.csv"
     analysis = dhcp.DHCPAnalysis(dhcp_file, location_file)
 
@@ -41,7 +41,9 @@ if __name__ == "__main__":
     #             print()
     # gmap.draw("map.html")
 
-    minute = 1
-    events, bins = analysis.get_num_events(minute)
+    # minute = 1
+    # events, bins = analysis.get_num_events(minute)
+    # fig1 = locp.LocationPlot.plot_total_events(events, bins, minute)
 
-    fig1 = locp.LocationPlot.plot_total_events(events, bins, minute, False, True)
+    buildings = analysis.get_events_per_building()
+    print(buildings)

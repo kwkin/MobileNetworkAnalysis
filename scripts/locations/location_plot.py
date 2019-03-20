@@ -59,36 +59,18 @@ class LocationPlot:
         gmap.scatter([latitudes[last_index]], [longitudes[last_index]], color.hex_l, size=sizes[last_index], marker=False)
     
     @staticmethod
-    def plot_total_events(count, bins, minutes, overlay_periods=True, min_and_max=True):
+    def plot_total_events(count, bins, minutes):
         fig, ax = plt.subplots()
                 
         plt.bar(bins, count, align='edge', width=1)
         max_value = np.amax(count)
         max_date = bins[np.argmax(count)]
         min_value = np.min(count)
-        min_date = bins[np.argmin(count)]
-        
-        # Add annotations for the min and max 
-        if (min_and_max):
-            plt.annotate(
-                    "value = {0}\ntime = {1}".format(max_value, max_date), 
-                    xy=(max_date, max_value), 
-                    xytext=[-150, 20],
-                    textcoords='offset pixels',
-                    bbox=dict(boxstyle='round,pad=0.5', fc='#D4CA3A', alpha=0.5),
-                    arrowprops=dict(arrowstyle = '->', connectionstyle='arc3,rad=0'))
-            plt.annotate(
-                    "min = {0}\ntime = {1}".format(min_value, min_date), 
-                    xy=(min_date, min_value), 
-                    xytext=[-150, 20],
-                    textcoords='offset pixels',
-                    bbox=dict(boxstyle='round,pad=0.5', fc='#FF6DAE', alpha=0.5),
-                    arrowprops=dict(arrowstyle = '->', connectionstyle='arc3,rad=0'))
-                    
-        # Draw vertical lins to indicate the start and stop of periods
-        
-                            
-        plt.title('Number of DHCP Events on UF every minute')
+        min_date = bins[np.argmin(count)]                    
+        if (minutes == 1):
+            plt.title('Number of DHCP Events every minute')
+        else:
+            plt.title('Number of DHCP Events every {0} minutes')
 
         # Add minor ticks if there are too many major ticks
         plt.xlabel('Time (HH:MM:SS)')

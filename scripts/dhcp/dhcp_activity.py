@@ -42,7 +42,6 @@ class DHCPAnalysis:
                 num_events[bin_index] += 1
         return num_events, bins
 
-
     def get_user_events(self, user_id):
         return DHCPAnalysis.get_trace_user_events(self.traces, user_id)
     
@@ -51,13 +50,13 @@ class DHCPAnalysis:
         user_traces = traces.loc[traces['userMAC'] == user_id]
         return user_traces
 
-    def get_buildings(self, user_id):
-        return DHCPAnalysis.get_trace_buildings(self.traces, self.locations, user_id)
+    def get_user_buildings(self, user_id):
+        return DHCPAnalysis.get_trace_user_buildings(self.traces, self.locations, user_id)
 
     @staticmethod
-    def get_trace_buildings(traces, locations, user_id):
+    def get_trace_user_buildings(traces, locations, user_id):
         """
-        Gets the user's favorite building  and time spent within the building. 
+        Gets the user's visited buildings and time spent within the building. 
 
         :returns:
             dictionary with keys of building and values with time duration
@@ -69,20 +68,44 @@ class DHCPAnalysis:
             building = locations.loc[locations['prefix'] == prefix]
             timespent = row['endTime'] - row['startTime']
             if (building.size == 0):
-                visited_buildings['unknown'] += timespent
+                building_name = 'unknown'
             else:
                 building_name = building['name'].values[0]
-                if (building_name not in visited_buildings):
-                    visited_buildings[building_name] = timespent
-                else:
-                    visited_buildings[building_name] += timespent
+                
+            if (building_name not in visited_buildings):
+                visited_buildings[building_name] = timespent
+            else:
+                visited_buildings[building_name] += timespent
         return visited_buildings
-    
-    def get_categories(self, user_id):
-        return DHCPAnalysis.get_trace_categories(self.traces, self.locations, user_id)
+
+    def get_user_visited_buildings(self, user_id):
+        return DHCPAnalysis.get_trace_user_buildings(self.traces, self.locations, user_id)
 
     @staticmethod
-    def get_trace_categories(traces, locations, user_id):
+    def get_trace_user_visited_buildings(traces, locations, user_id):
+        """
+        Gets the user's visited buildings and time spent within the building. 
+
+        :returns:
+            dictionary with keys of building and values with time duration
+        """
+        user_traces = traces.loc[traces['userMAC'] == user_id]
+        access_points = user_traces['APNAME'].unique()
+        visited_buildings = set()
+        for access_point in access_points:
+            prefix = re.findall('[a-zA-Z]+', access_point)[0]
+            building = locations.loc[locations['prefix'] == prefix]
+            if (building.size == 0):
+                visited_buildings.add('unknown')
+            else:
+                visited_buildings.add(building['name'].values[0])
+        return visited_buildings
+    
+    def get_user_categories(self, user_id):
+        return DHCPAnalysis.get_trace_user_categories(self.traces, self.locations, user_id)
+
+    @staticmethod
+    def get_trace_user_categories(traces, locations, user_id):
         """
         Gets the users favorite building catogries and time spent within the building category. 
 
@@ -105,11 +128,11 @@ class DHCPAnalysis:
                     visited_categories[category] += timespent
         return visited_categories
     
-    def get_trip(self, user_id):
-        return DHCPAnalysis.get_trace_trip(self.traces, self.locations, user_id)
+    def get_user_trip(self, user_id):
+        return DHCPAnalysis.get_trace_user_trip(self.traces, self.locations, user_id)
 
     @staticmethod
-    def get_trace_trip(traces, locations, user_id):
+    def get_trace_user_trip(traces, locations, user_id):
         """
         Gets the users path. 
         """
@@ -148,3 +171,68 @@ class DHCPAnalysis:
                 current_duration += timespent
         return trip
 
+    def get_events_per_building(self):
+        """
+        Calculates the number of events at each building
+        
+        :returns:
+            events (dict): a dictionary with building keys a values with unique events
+        """
+        buildings = self.locations['name'].values
+        building_count = {}
+        for building in buildings:
+            building_count[building] = 0
+        building_count['unknown'] = 0
+        
+        for index, row in self.traces.iterrows():
+            prefix = re.findall('[a-zA-Z]+', row['APNAME'])[0]
+            building = self.locations.loc[self.locations['prefix'] == prefix]
+            if (building.size == 0):
+                building = 'unknown'
+            else:
+                building = building['name'].values[0]
+            building_count[building] += 1
+        return building_count
+
+    @staticmethod
+    def get_trace_events_per_building(traces, locations):
+        buildings = locations['name'].values
+        building_count = {}
+        for building in buildings:
+            building_count[building] = 0
+        building_count['unknown'] = 0
+        
+        for index, row in traces.iterrows():
+            prefix = re.findall('[a-zA-Z]+', row['APNAME'])[0]
+            building = locations.loc[locations['prefix'] == prefix]
+            if (building.size == 0):
+                building = 'unknown'
+            else:
+                building = building['name'].values[0]
+            building_count[building] += 1
+        return building_count
+
+    def get_unique_events_per_building(self):
+        """
+        Calculates the number of unique device IDs that visit each building
+        
+        :returns:
+            events (dict): a dictionary with building keys a values with unique events
+        """
+        return DHCPAnalysis.get_trace_unique_events_per_building(self.traces, self.locations)
+
+    @staticmethod
+    def get_trace_unique_events_per_building(traces, locations):
+        buildings = locations['name'].values
+        building_count = {}
+        for building in buildings:
+            building_count[building] = 0
+        building_count['unknown'] = 0
+        
+        first_user_id = traces['userMAC'].min()
+        last_user_id = traces['userMAC'].max()
+        for user_index in range(first_user_id, last_user_id):
+            visited_buildings = DHCPAnalysis.get_trace_user_visited_buildings(traces, locations, user_index)
+            for visited_building in visited_buildings:
+                building_count[visited_building] += 1
+        return building_count
