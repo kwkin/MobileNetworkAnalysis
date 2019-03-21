@@ -42,8 +42,13 @@ if __name__ == "__main__":
     # gmap.draw("map.html")
 
     # minute = 1
-    # events, bins = analysis.get_num_events(minute)
-    # fig1 = locp.LocationPlot.plot_total_events(events, bins, minute)
+    # events, bins = analysis.get_num_eventsvents(events, bins, minute)
+    # fig1 = locp.LocationPlot.plot_total_e
+    # buildings = analysis.get_events_per_building()
+    # print(buildings)
 
-    buildings = analysis.get_events_per_building()
-    print(buildings)
+    start_time = analysis.earliest_time
+    duration = 1000
+    buildings = analysis.get_unique_events_per_building_time(start_time, duration)
+    buildings = analysis.get_locations_from_buildings(buildings)
+    locp.LocationPlot.plot_building_heatmap(buildings)

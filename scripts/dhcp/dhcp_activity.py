@@ -18,6 +18,8 @@ class DHCPAnalysis:
         self.location_file = location_file
         self.traces = pd.read_csv(dhcp_file)
         self.locations = pd.read_csv(location_file)
+        self.earliest_time = self.traces['startTime'].min()
+        self.latest_time = self.traces['endTime'].max()
     
     def get_num_events(self, minutes):
         return DHCPAnalysis.get_trace_num_events(self.traces, minutes)
@@ -236,3 +238,33 @@ class DHCPAnalysis:
             for visited_building in visited_buildings:
                 building_count[visited_building] += 1
         return building_count
+
+    def get_unique_events_per_building_time(self, start_time, seconds):
+        """
+        Calculates the number of unique device IDs that visit each building in the specified time interval
+        
+        :returns:
+            events (dict): a dictionary with building keys a values with unique events
+        """
+        return DHCPAnalysis.get_trace_unique_events_per_building_time(self.traces, self.locations, start_time, seconds)
+
+    @staticmethod
+    def get_trace_unique_events_per_building_time(traces, locations, start_time, seconds):        
+        traces = traces.loc[traces['startTime'] >= start_time]
+        traces = traces.loc[traces['endTime'] <= start_time + seconds]
+        return DHCPAnalysis.get_trace_unique_events_per_building(traces, locations)
+
+    def get_locations_from_buildings(self, buildings):
+        return DHCPAnalysis.get_trace_locations_from_buildings(buildings, self.locations)
+
+    @staticmethod
+    def get_trace_locations_from_buildings(buildings, locations):
+        Building = namedtuple("Building", "building lat lon density")
+        buildings_and_locations = []
+        for name, density in buildings.items():
+            building_row = locations.loc[locations['name'] == name]
+            if (building_row.size != 0):
+                latitude = building_row['lat'].values[0]
+                longitude = building_row['lon'].values[0]
+                buildings_and_locations.append(Building(building=name, lat=latitude, lon=longitude, density=density))
+        return buildings_and_locations

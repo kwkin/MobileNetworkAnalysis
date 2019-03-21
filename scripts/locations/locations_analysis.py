@@ -59,8 +59,3 @@ class LocationsAnalysis:
             trip (named tuple): The trip without unknown locations
         """
         return list(filter(lambda x: x.building != None, trip))
-
-    @staticmethod
-    def get_positions():
-        print("Get positions.")
-
