@@ -1,11 +1,13 @@
 from dhcp import dhcp_activity as dhcp
-from util import time_util as timeu
 from locations import locations_analysis as loc
 from locations import location_plot as locp
+from util import image_util as imageu
+from util import time_util as timeu
 
 from colour import Color
 
 import gmplot
+import numpy as np
 
 if __name__ == "__main__":
     dhcp_file = "data/dhcp/outputwireless-logs-20120407.DHCP_ANON.csv"
@@ -49,9 +51,25 @@ if __name__ == "__main__":
 
     # TODO generate heatmap with a weight dependent upon density, distance, and total time spent
 
-    start_time = analysis.earliest_time + 60000
-    duration = 10000
-    buildings = analysis.get_unique_events_per_building_time(start_time, duration)
-    buildings = analysis.get_locations_from_buildings(buildings)
-    locp.LocationPlot.plot_building_heatmap(buildings)
+    # start_time = analysis.earliest_time
+    # duration = 86400
+    # buildings = analysis.get_unique_events_per_building_time(start_time, duration)
+    # buildings = analysis.get_locations_from_buildings(buildings)
+    # locp.LocationPlot.plot_building_heatmap(buildings)
+    # print("Finished")
+    
+    # TODO merge commands in a single pipeline of generating the heatmap
+    start_time = analysis.earliest_time
+    stop_time = analysis.latest_time
+    duration = 900
+    starts = np.arange(start_time, stop_time, duration)
+    stop_index = starts.size
+    for index, start in zip(range(1, stop_index + 1), starts):
+        buildings = analysis.get_unique_events_per_building_time(start, duration)
+        buildings = analysis.get_locations_from_buildings(buildings)
+        stop = start + duration
+        # locp.LocationPlot.plot_building_heatmap(buildings, start, stop)
+        locp.LocationPlot.generate_heatmap(buildings, start, stop)
+        print("Finished {0} / {1}".format(index, stop_index))
+    imageu.ImageUtil.convert_images_to_gif("./output", 500)
     print("Finished")

@@ -110,3 +110,5 @@ venv.bak/
 scripts/bluetooth/\.vs/bluetooth/v15/
 
 scripts/bluetooth/\.vs/
+
+*.gif
