@@ -1,6 +1,7 @@
 from colour import Color
 from scipy import stats
 
+import math
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import gmplot
@@ -110,45 +111,51 @@ class LocationPlot:
 
     @staticmethod
     def plot_building_heatmap(densities):
-        lats = [visit.lat for visit in densities]
-        lons = [visit.lon for visit in densities]
-        lats = np.array(lats)
-        lons = np.array(lons)
-        xmin = lons.min()
-        xmax = lons.max()
-        ymin = lats.min()
-        ymax = lats.max()
+        grid_points = 150
+        lats = np.array([visit.lat for visit in densities])
+        lons = np.array([visit.lon for visit in densities])
+        events = np.array([visit.density for visit in densities])
 
-        X, Y = np.mgrid[xmin:xmax:0.00025, ymin:ymax:0.00025]
-        positions = np.vstack([X.ravel(), Y.ravel()])
+        lon_range = np.ptp(lons)
+        lon_min = lons.min() - lon_range / 3
+        lon_max = lons.max() + lon_range / 3
+        lon_step = lon_range / grid_points
+        lon_center = np.median(lons)
+        lon_midpt = np.mean([lon_min, lon_max])
+
+        lat_range = np.ptp(lats)
+        lat_min = lats.min() - lat_range / 3
+        lat_max = lats.max() + lat_range / 3
+        lat_step = lat_range / grid_points
+        lat_center = np.median(lats)
+        lat_midpt = np.mean([lat_min, lat_max])
+
+        # Generate heatmap values
+        lon_grid, lat_grid = np.mgrid[lon_min:lon_max:lon_step, lat_min:lat_max:lat_step]
+        positions = np.vstack([lon_grid.ravel(), lat_grid.ravel()])
         values = np.vstack([lons, lats])
-        kernel = stats.gaussian_kde(values)
-        Z = np.reshape(kernel(positions), X.shape)
-        Z[Z<1] = np.nan
+        kernel = stats.gaussian_kde(values, weights=events)
+        heatmap = np.reshape(kernel(positions), lon_grid.shape)
+
+        # Create heatmap figure
         fig = plt.figure(frameon=True)
-        ax = plt.Axes(fig, [0., 0., 1., 1.])
+        ax = plt.Axes(fig, [0.0, 0.0, 1.0, 1.0])
         ax.set_aspect('equal')
         ax.set_axis_off()
         ax.tick_params(which='both', direction='in')
         fig.add_axes(ax)
-        ax.imshow(np.rot90(Z),cmap='coolwarm', alpha=0.4, extent=[xmin, xmax, ymin, ymax])
+        ax.imshow(np.rot90(heatmap),cmap='coolwarm', alpha=0.4, extent=[lon_min, lon_max, lat_min, lat_max])
         extent = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
         fig.savefig('building_heatmap.png', format='png', dpi=300, transparent=True, bbox_inches=extent, pad_inches=0)
 
-        lon_midpt = np.mean([xmin, xmax])
-        lat_midpt = np.mean([ymin, ymax])
-
-        grid_points = 150
+        # Overlay on plot
         img_bounds = {}
-        img_bounds['west'] = (xmin - lon_midpt) * (grid_points / (grid_points - 1)) + lon_midpt
-        img_bounds['east'] = (xmax - lon_midpt) * (grid_points / (grid_points - 1)) + lon_midpt
-        img_bounds['north'] = (ymax - lat_midpt) * (grid_points / (grid_points - 1)) + lat_midpt
-        img_bounds['south'] = (ymin - lat_midpt) * (grid_points / (grid_points - 1)) + lat_midpt
+        img_bounds['west'] = (lon_min - lon_midpt) * (grid_points / (grid_points - 1)) + lon_midpt
+        img_bounds['east'] = (lon_max - lon_midpt) * (grid_points / (grid_points - 1)) + lon_midpt
+        img_bounds['north'] = (lat_max - lat_midpt) * (grid_points / (grid_points - 1)) + lat_midpt
+        img_bounds['south'] = (lat_min - lat_midpt) * (grid_points / (grid_points - 1)) + lat_midpt
 
-        lat_center = np.median(lats)
-        lon_center = np.median(lons)
-        gmap = gmplot.GoogleMapPlotter(lat_center, lon_center, zoom=11)
-
+        gmap = gmplot.GoogleMapPlotter(lat_center, lon_center, zoom=15)
         gmap.ground_overlay('building_heatmap.png', img_bounds)
-        gmap.scatter(lats, lons, '#3B0B39', size=15, marker=False)
+        gmap.scatter(lats, lons, '#3B0B39', size=20, marker=False)
         gmap.draw('map.html')

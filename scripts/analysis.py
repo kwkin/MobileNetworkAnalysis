@@ -47,8 +47,11 @@ if __name__ == "__main__":
     # buildings = analysis.get_events_per_building()
     # print(buildings)
 
-    start_time = analysis.earliest_time
-    duration = 1000
+    # TODO generate heatmap with a weight dependent upon density, distance, and total time spent
+
+    start_time = analysis.earliest_time + 60000
+    duration = 10000
     buildings = analysis.get_unique_events_per_building_time(start_time, duration)
     buildings = analysis.get_locations_from_buildings(buildings)
     locp.LocationPlot.plot_building_heatmap(buildings)
+    print("Finished")
