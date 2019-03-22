@@ -162,6 +162,7 @@ class LocationPlot:
         file_name = 'event_heatmap_{0}_{1}.png'.format(time_start, time_stop)
         file_path = os.path.join(out_dir, file_name)
         fig.savefig(file_path, format='png', dpi=300, transparent=True, bbox_inches=extent, pad_inches=0)
+        plt.close(fig)
         return file_path
 
     @staticmethod
@@ -204,6 +205,41 @@ class LocationPlot:
             gmap.scatter(lats, lons, '#3B0B39', alpha=0.4, size=20, marker=False)
             
         file_name = 'map_{0}_{1}.html'.format(start, stop)
+        gmap.draw(file_name)
+
+    @staticmethod
+    def create_map_overlay(densities, heatmap, title="map"):
+        grid_points = 150
+        lats = np.array([visit.lat for visit in densities])
+        lons = np.array([visit.lon for visit in densities])
+        events = np.array([visit.density for visit in densities])
+
+        lon_range = np.ptp(lons)
+        lon_min = lons.min() - lon_range / 3
+        lon_max = lons.max() + lon_range / 3
+        lon_step = lon_range / grid_points
+        lon_center = np.median(lons)
+        lon_midpt = np.mean([lon_min, lon_max])
+
+        lat_range = np.ptp(lats)
+        lat_min = lats.min() - lat_range / 3
+        lat_max = lats.max() + lat_range / 3
+        lat_step = lat_range / grid_points
+        lat_center = np.median(lats)
+        lat_midpt = np.mean([lat_min, lat_max])
+
+        # Overlay on plot
+        img_bounds = {}
+        img_bounds['west'] = (lon_min - lon_midpt) * (grid_points / (grid_points - 1)) + lon_midpt
+        img_bounds['east'] = (lon_max - lon_midpt) * (grid_points / (grid_points - 1)) + lon_midpt
+        img_bounds['north'] = (lat_max - lat_midpt) * (grid_points / (grid_points - 1)) + lat_midpt
+        img_bounds['south'] = (lat_min - lat_midpt) * (grid_points / (grid_points - 1)) + lat_midpt
+
+        gmap = gmplot.GoogleMapPlotter(lat_center, lon_center, zoom=15)
+        gmap.ground_overlay(heatmap, img_bounds)
+        gmap.scatter(lats, lons, '#3B0B39', alpha=0.5, size=20, marker=False)
+        
+        file_name = '{0}.html'.format(title)
         gmap.draw(file_name)
 
     @staticmethod

@@ -23,4 +23,6 @@ class ImageUtil:
         # TODO use PIL to add transparency
         images = list(map(lambda image: imageio.imread(image), filenames))
 
-        imageio.mimsave('heatmaps_over.gif', images, duration=duration/1000)
+        outputfile = 'heatmaps_over.gif'
+        imageio.mimsave(outputfile, images, duration=duration/1000)
+        return outputfile
