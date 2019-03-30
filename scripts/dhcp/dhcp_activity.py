@@ -14,7 +14,7 @@ import re
 
 class DHCPAnalysis:
     def __init__(self, dhcp_file, location_file):
-        self.file = dhcp_file
+        self.dhcp_file = dhcp_file
         self.location_file = location_file
         self.traces = pd.read_csv(dhcp_file)
         self.locations = pd.read_csv(location_file)
@@ -26,6 +26,11 @@ class DHCPAnalysis:
         
     @staticmethod
     def get_trace_num_events(traces, minutes):
+        """
+        Gets the number of events that occured between the specified minutes
+
+        The events are allocated to each appropriate minute bin.
+        """
         seconds = minutes * 60.0
         earliest_time = traces['startTime'].min()
         latest_time = traces['endTime'].max()
@@ -38,19 +43,10 @@ class DHCPAnalysis:
             end_time = row['endTime']
             num_affected_bins = math.floor((end_time - start_time) / (seconds)) + 1
             start_bin = math.floor((start_time - earliest_time) * minutes / 60)
-            # print("end: {0} start: {1} num: {2}".format(end_time, start_time, num_periods))
             for bin_index in range(start_bin, start_bin + num_affected_bins):
                 bin_index = min(bin_index, len(bins) - 1)
                 num_events[bin_index] += 1
         return num_events, bins
-
-    def get_user_events(self, user_id):
-        return DHCPAnalysis.get_trace_user_events(self.traces, user_id)
-    
-    @staticmethod
-    def get_trace_user_events(traces, user_id):
-        user_traces = traces.loc[traces['userMAC'] == user_id]
-        return user_traces
 
     def get_user_buildings(self, user_id):
         return DHCPAnalysis.get_trace_user_buildings(self.traces, self.locations, user_id)
@@ -91,7 +87,7 @@ class DHCPAnalysis:
         :returns:
             dictionary with keys of building and values with time duration
         """
-        user_traces = traces.loc[traces['userMAC'] == user_id]
+        user_traces = dhcpf.filter_user(traces, user_id)
         access_points = user_traces['APNAME'].unique()
         visited_buildings = set()
         for access_point in access_points:
@@ -114,7 +110,7 @@ class DHCPAnalysis:
         :returns:
             dictionary with keys of building category and values with time duration
         """
-        user_traces = traces.loc[traces['userMAC'] == user_id]
+        user_traces = dhcpf.filter_user(traces, user_id)
         visited_categories = {}
         for index, row in user_traces.iterrows():
             prefix = re.findall('[a-zA-Z]+', row['APNAME'])[0]
@@ -172,6 +168,15 @@ class DHCPAnalysis:
                 timespent = row['endTime'] - row['startTime']
                 current_duration += timespent
         return trip
+
+    @staticmethod
+    def trace_refine_trip(trip, threshold):
+        refined_trip = []
+        for location in trip:
+            duration = location.duration
+            if (duration >= threshold):
+                refined_trip.append(location)
+        return refined_trip
 
     def get_events_per_building(self):
         """
@@ -268,3 +273,15 @@ class DHCPAnalysis:
                 longitude = building_row['lon'].values[0]
                 buildings_and_locations.append(Building(building=name, lat=latitude, lon=longitude, density=density))
         return buildings_and_locations
+    
+    def get_weights(self, start_location, stop_location, start_time, stop_time):
+        return DHCPAnalysis.get_trace_weights(self.traces, self.locations, start_location, stop_location, start_time, stop_time)
+
+    @staticmethod
+    def get_trace_weights(buildings, locations, start_location, stop_location, start_time, stop_time):
+        # Get distance between start and stop
+
+        # Get activity/density between start and stop at the location
+
+
+        return 0

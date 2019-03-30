@@ -17,6 +17,13 @@ class LocationsAnalysis:
         return favorite_building, keys_and_times[favorite_building]
 
     @staticmethod
+    def get_distance(start, stop):
+        start_coords = (start.lat, start.lon)
+        stop_coords = (stop.lat, stop.lon)
+        distance = geopy.distance.vincenty(start_coords, stop_coords).miles
+        return distance
+
+    @staticmethod
     def get_distances(trip):
         """
         Gets the total distance traveled on the trip

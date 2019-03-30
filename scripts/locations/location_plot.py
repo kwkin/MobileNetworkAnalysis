@@ -8,6 +8,8 @@ import gmplot
 import numpy as np
 import os
 
+from gmplot.color_dicts import html_color_codes
+
 class LocationPlot:
 
     @staticmethod
@@ -42,10 +44,11 @@ class LocationPlot:
         
 
     @staticmethod
-    def plot_trip_color(gmap, trip, color):
+    def plot_trip_color(gmap, trip, color, scatter=False, marker=True):
         latitudes = [visit.lat for visit in trip]
         longitudes = [visit.lon for visit in trip]
 
+        # TODO split visitation as separate class
         sizes = np.linspace(15, 5, len(latitudes))
         last_index = len(latitudes) - 1
         for position_index in range(last_index):
@@ -57,9 +60,24 @@ class LocationPlot:
             lons = [start_lon, stop_lon]
             size = sizes[position_index]
             gmap.plot(lats, lons, color.hex_l, edge_width=4, alpha=0.5)
-            gmap.scatter([start_lat], [start_lon], color.hex_l, size=size, marker=False)
+            if scatter:
+                gmap.scatter([start_lat], [start_lon], color.hex_l, size=size, marker=False)
+            if marker:
+                marker_color = html_color_codes['maroon']
+                title = trip[position_index].building + '\\n'
+                title += 'Stop: ' + str(position_index) + '\\n'
+                title += 'Duration: ' + str(trip[position_index].duration) + '\\n'
+                gmap.marker(start_lat, start_lon, color=marker_color, title=title)
         
-        gmap.scatter([latitudes[last_index]], [longitudes[last_index]], color.hex_l, size=sizes[last_index], marker=False)
+        if scatter:
+            gmap.scatter([latitudes[last_index]], [longitudes[last_index]], color.hex_l, size=sizes[last_index], marker=False)
+        if marker:
+            position_index += 1
+            marker_color = html_color_codes['maroon']
+            title = trip[position_index].building + '\\n'
+            title += 'Stop: ' + str(position_index) + '\\n'
+            title += 'Duration: ' + str(trip[position_index].duration) + '\\n'
+            gmap.marker(latitudes[last_index], longitudes[last_index], color=marker_color, title=title)
     
     @staticmethod
     def plot_total_events(count, bins, minutes):
