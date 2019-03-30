@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-from collections import namedtuple
+from locations import trip_visit as visit
+from locations import building
+
 import calendar
 import datetime as dt
 import matplotlib.pyplot as plt
@@ -141,7 +143,7 @@ class DHCPAnalysis:
 
         trip = []
         current_duration = 0
-        Visit = namedtuple("Visit", "building lat lon duration")
+        start_time = 0
         for index, row in user_traces.iterrows():
             prefix = re.findall('[a-zA-Z]+', row['APNAME'])[0]
             location = locations.loc[locations['prefix'] == prefix]
@@ -151,7 +153,7 @@ class DHCPAnalysis:
                 building = None
 
             if (index == user_traces.values.size - 1):
-                trip.append(Visit(building=previous_building, lat=previous_lat, lon=previous_lon, duration=current_duration))
+                trip.append(visit.Visit(building=previous_building, lat=previous_lat, lon=previous_lon, start=start_time, duration=current_duration))
             elif (previous_building != building):
                 # Add visit as a new location if it does not match previous prefix
                 previous_building = building
@@ -161,8 +163,9 @@ class DHCPAnalysis:
                 else:
                     previous_lat = None
                     previous_lon = None
-                current_duration = row['endTime'] - row['startTime']
-                trip.append(Visit(building=previous_building, lat=previous_lat, lon=previous_lon, duration=current_duration))
+                start_time = row['startTime']
+                current_duration = row['endTime'] - start_time
+                trip.append(visit.Visit(building=previous_building, lat=previous_lat, lon=previous_lon, start=start_time, duration=current_duration))
             else:
                 # Add to the previous visit duration if it matches previous prefix
                 timespent = row['endTime'] - row['startTime']
@@ -264,14 +267,13 @@ class DHCPAnalysis:
 
     @staticmethod
     def get_trace_locations_from_buildings(buildings, locations):
-        Building = namedtuple("Building", "building lat lon density")
         buildings_and_locations = []
         for name, density in buildings.items():
             building_row = locations.loc[locations['name'] == name]
             if (building_row.size != 0):
                 latitude = building_row['lat'].values[0]
                 longitude = building_row['lon'].values[0]
-                buildings_and_locations.append(Building(building=name, lat=latitude, lon=longitude, density=density))
+                buildings_and_locations.append(building.Building(building=name, lat=latitude, lon=longitude, density=density))
         return buildings_and_locations
     
     def get_weights(self, start_location, stop_location, start_time, stop_time):
@@ -282,6 +284,4 @@ class DHCPAnalysis:
         # Get distance between start and stop
 
         # Get activity/density between start and stop at the location
-
-
         return 0

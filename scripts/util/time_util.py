@@ -1,4 +1,5 @@
 import datetime as dt
+import math
 import numpy as np
 
 def has_overlap(start1, end1, start2, end2):
@@ -49,6 +50,17 @@ def total_time(start_times, end_times):
     total = np.sum(differences)
     return total
 
+def display_time(seconds):
+    """
+    Converts seconds to a string for display
+
+    The format follows: hh:mm:ss
+    """
+    seconds_disp = seconds % 60
+    minutes_disp = math.floor(seconds / 60) % 60
+    hours_disp = math.floor(seconds / 3600) % 60
+    display = '{:02d}:{:02d}:{:02d}'.format(hours_disp, minutes_disp, seconds_disp)
+    return display
 
 if __name__ == "__main__":
     start_time_1 = dt.datetime(year=2019, month=1, day=1, hour=0, minute=0, second=0)

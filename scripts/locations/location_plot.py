@@ -1,9 +1,12 @@
 from colour import Color
 from scipy import stats
+from util import time_util as timeu
 
+import datetime as dt
 import math
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
+import pandas as pd
 import gmplot
 import numpy as np
 import os
@@ -45,12 +48,10 @@ class LocationPlot:
 
     @staticmethod
     def plot_trip_color(gmap, trip, color, scatter=False, marker=True):
-        latitudes = [visit.lat for visit in trip]
-        longitudes = [visit.lon for visit in trip]
 
         # TODO split visitation as separate class
-        sizes = np.linspace(15, 5, len(latitudes))
-        last_index = len(latitudes) - 1
+        sizes = np.linspace(15, 5, len(trip))
+        last_index = len(trip) - 1
         for position_index in range(last_index):
             start_lat = trip[position_index].lat
             start_lon = trip[position_index].lon
@@ -63,21 +64,13 @@ class LocationPlot:
             if scatter:
                 gmap.scatter([start_lat], [start_lon], color.hex_l, size=size, marker=False)
             if marker:
-                marker_color = html_color_codes['maroon']
-                title = trip[position_index].building + '\\n'
-                title += 'Stop: ' + str(position_index) + '\\n'
-                title += 'Duration: ' + str(trip[position_index].duration) + '\\n'
-                gmap.marker(start_lat, start_lon, color=marker_color, title=title)
+                LocationPlot.add_visit(position_index, trip[position_index], gmap)
         
+        position_index += 1
         if scatter:
-            gmap.scatter([latitudes[last_index]], [longitudes[last_index]], color.hex_l, size=sizes[last_index], marker=False)
+            gmap.scatter([trip[last_index].lat], [trip[last_index].lon], color.hex_l, size=sizes[last_index], marker=False)
         if marker:
-            position_index += 1
-            marker_color = html_color_codes['maroon']
-            title = trip[position_index].building + '\\n'
-            title += 'Stop: ' + str(position_index) + '\\n'
-            title += 'Duration: ' + str(trip[position_index].duration) + '\\n'
-            gmap.marker(latitudes[last_index], longitudes[last_index], color=marker_color, title=title)
+            LocationPlot.add_visit(position_index, trip[position_index], gmap)
     
     @staticmethod
     def plot_total_events(count, bins, minutes):
@@ -268,3 +261,16 @@ class LocationPlot:
         radius_squared = math.sqrt(area / math.pi)
         radius = math.sqrt(radius_squared)
         return radius
+
+    @staticmethod
+    def add_visit(position_index, visit, gmap, marker_color=html_color_codes['maroon']):
+        # Convert duration from seconds to minutes
+        ts = pd.to_datetime(visit.start, unit='s')
+        ts = ts.tz_localize('UTC')
+        start_time = dt.datetime(ts.year, ts.month, ts.day, ts.hour, ts.minute, ts.second).strftime('%H:%M:%S')
+
+        title = visit.building + '\\n'
+        title += 'Stop: ' + str(position_index) + '\\n'
+        title += 'Start: ' + str(start_time) + '\\n'
+        title += 'Duration: ' + timeu.display_time(visit.duration) + '\\n'
+        gmap.marker(visit.lat, visit.lon, color=marker_color, title=title)
