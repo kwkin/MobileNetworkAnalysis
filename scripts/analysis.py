@@ -13,8 +13,6 @@ import numpy as np
 # TODO construct densitiy information for paths at specific times
 # TODO get distance between paths (for now use WGS84 reference elipsoid, but later explain how this can be modified for google map routes)
 # TODO construct weighted routes between notes based upon density, and map routes
-# TODO identify trips based upon visit duration. Longer durations would constitute a start and stop for a trip
-# TODO identify the average distance traveled by people
 if __name__ == "__main__":
     dhcp_file = "data/dhcp/outputwireless-logs-20120409.DHCP_ANON.csv"
     location_file = "data/prefix_lat_lon_name_category_main_campus.csv"
@@ -32,8 +30,9 @@ if __name__ == "__main__":
     #     print()
     # print("Total: {0}".format(loc.LocationsAnalysis.get_total_distance(trip)))
 
-    start_user = 505
-    stop_user = 505
+    # 120 is a good path
+    start_user = 120
+    stop_user = 120
     users = range(start_user, stop_user + 1)
     colors = list(Color("#c92318").range_to(Color("#45c6f9"), len(users)))
     gmap = gmplot.GoogleMapPlotter(29.645,-82.355, 13)
@@ -42,7 +41,7 @@ if __name__ == "__main__":
         trip = loc.LocationsAnalysis.filter_trips(trip)
         if (len(trip) > 0):
             color = colors[user_id - start_user]
-            locp.LocationPlot.plot_trip_color(gmap, trip, color)
+            locp.LocationPlot.plot_trip(gmap, trip, color, True, True)
             # refined_trip = dhcp.DHCPAnalysis.trace_refine_trip(trip, 60)
             # locp.LocationPlot.plot_trip_color(gmap, refined_trip, Color("#ffffff"))
             # for index, location in zip(range(len(trip)), trip):
@@ -57,7 +56,6 @@ if __name__ == "__main__":
     # print(buildings)
 
     # TODO generate heatmap with a weight dependent upon density, distance, and total time spent
-
     # start_time = analysis.earliest_time
     # duration = 86400
     # buildings = analysis.get_unique_events_per_building_time(start_time, duration)

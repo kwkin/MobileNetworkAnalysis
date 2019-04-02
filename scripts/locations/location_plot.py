@@ -1,6 +1,10 @@
 from colour import Color
 from scipy import stats
 from util import time_util as timeu
+from gmplot.color_dicts import html_color_codes
+
+from .trip_visit import Visit
+from .building import Building
 
 import datetime as dt
 import math
@@ -11,12 +15,9 @@ import gmplot
 import numpy as np
 import os
 
-from gmplot.color_dicts import html_color_codes
-
 class LocationPlot:
-
     @staticmethod
-    def plot_trip(gmap, trip, multi_color=True):
+    def plot_trip(gmap, trip, multi_color=True, scatter=False, marker=True):
         latitudes = [visit.lat for visit in trip]
         longitudes = [visit.lon for visit in trip]
         if (multi_color):
@@ -37,21 +38,28 @@ class LocationPlot:
                 color = Color("#50cefc")
             size = sizes[position_index]
             gmap.plot(lats, lons, color.hex_l, edge_width=4, alpha=0.5)
-            gmap.scatter([start_lat], [start_lon], color.hex_l, size=size, marker=False)
+            if scatter:
+                gmap.scatter([start_lat], [start_lon], color.hex_l, size=size, marker=False)
+            if marker:
+                LocationPlot.add_visits(trip, gmap)
             
         if (multi_color):
             color = colors[last_index]
         else:
             color = Color("#50cefc")
-        gmap.scatter([latitudes[last_index]], [longitudes[last_index]], color.hex_l, size=sizes[last_index], marker=False)
+        if scatter:
+            gmap.scatter([latitudes[last_index]], [longitudes[last_index]], color.hex_l, size=sizes[last_index], marker=False)
+        if marker:
+            LocationPlot.add_visits(trip, gmap)
         
 
     @staticmethod
-    def plot_trip_color(gmap, trip, color, scatter=False, marker=True):
+    def plot_trip_color(gmap, trip, color=Color("#c92318"), scatter=False, marker=True):
 
         # TODO split visitation as separate class
         sizes = np.linspace(15, 5, len(trip))
         last_index = len(trip) - 1
+        building_visits = []
         for position_index in range(last_index):
             start_lat = trip[position_index].lat
             start_lon = trip[position_index].lon
@@ -63,14 +71,12 @@ class LocationPlot:
             gmap.plot(lats, lons, color.hex_l, edge_width=4, alpha=0.5)
             if scatter:
                 gmap.scatter([start_lat], [start_lon], color.hex_l, size=size, marker=False)
-            if marker:
-                LocationPlot.add_visit(position_index, trip[position_index], gmap)
-        
+
         position_index += 1
         if scatter:
             gmap.scatter([trip[last_index].lat], [trip[last_index].lon], color.hex_l, size=sizes[last_index], marker=False)
         if marker:
-            LocationPlot.add_visit(position_index, trip[position_index], gmap)
+            LocationPlot.add_visits(trip, gmap)
     
     @staticmethod
     def plot_total_events(count, bins, minutes):
@@ -263,14 +269,28 @@ class LocationPlot:
         return radius
 
     @staticmethod
-    def add_visit(position_index, visit, gmap, marker_color=html_color_codes['maroon']):
+    def add_visits(visits, gmap, marker_color=html_color_codes['maroon']):
         # Convert duration from seconds to minutes
-        ts = pd.to_datetime(visit.start, unit='s')
-        ts = ts.tz_localize('UTC')
-        start_time = dt.datetime(ts.year, ts.month, ts.day, ts.hour, ts.minute, ts.second).strftime('%H:%M:%S')
+        buildings_visited = set()
+        for visit in visits:
+            building = Building(building=visit.building, lat=visit.lat, lon=visit.lon, density=0)
+            buildings_visited.add(building)
 
-        title = visit.building + '\\n'
-        title += 'Stop: ' + str(position_index) + '\\n'
-        title += 'Start: ' + str(start_time) + '\\n'
-        title += 'Duration: ' + timeu.display_time(visit.duration) + '\\n'
-        gmap.marker(visit.lat, visit.lon, color=marker_color, title=title)
+        for building in buildings_visited:
+            visits_at_building = [i for i, x in enumerate(visits) if x.building == building.building]
+            
+            title = ""
+            for visit_index in visits_at_building:
+                visit = visits[visit_index]
+                ts = pd.to_datetime(visit.start, unit='s')
+                ts = ts.tz_localize('UTC')
+                start_time = dt.datetime(ts.year, ts.month, ts.day, ts.hour, ts.minute, ts.second).strftime('%H:%M:%S')
+                time_sense_last = 0
+                if (visit_index < len(visits) - 1):
+                    time_sense_last = visits[visit_index + 1].start - visits[visit_index].start
+                title += 'Stop: ' + str(visit_index) + '\\n'
+                title += 'Building: ' + visit.building + '\\n'
+                title += 'Start: ' + str(start_time) + '\\n'
+                title += 'Duration: ' + timeu.display_time(visit.duration) + '\\n'
+                title += 'Time Before Next: ' + timeu.display_time(time_sense_last) + '\\n\\n'
+            gmap.marker(building.lat, building.lon, color=marker_color, title=title)
