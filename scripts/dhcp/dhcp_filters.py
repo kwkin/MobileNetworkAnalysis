@@ -1,4 +1,5 @@
 import pandas as pd
+import re
 
 """
 Contains some common filters for getting data from the dhcp file
@@ -64,3 +65,23 @@ class DHCPFilters:
         """
         # TODO
         return traces
+    
+    @staticmethod
+    def write_building_names(dhcp_file, location_file, file_name):
+        """
+        Writes the visited building next to the event
+        """
+        traces = pd.read_csv(dhcp_file)
+        locations = pd.read_csv(location_file)
+
+        buildings = []
+        for index, row in traces.iterrows():
+            prefix = re.findall('[a-zA-Z]+', row['APNAME'])[0]
+            building = locations.loc[locations['prefix'] == prefix]
+            if (building.size == 0):
+                building_name = 'unknown'
+            else:
+                building_name = building['name'].values[0]
+            buildings.append(building_name)
+        traces['building'] = buildings
+        traces.to_csv(file_name, index=None)

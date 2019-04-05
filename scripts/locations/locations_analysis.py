@@ -58,6 +58,19 @@ class LocationsAnalysis:
         return total_distance
 
     @staticmethod
+    def get_total_duration(trip):
+        """
+        Gets the total duration of the trip in seconds
+
+        The total duration will be the different between the first and last
+        start times + the duration of the last trip.
+
+        :returns:
+            duration (double): the total duration of the trip in seconds
+        """
+        return trip[len(trip) - 1].start - trip[0].start + trip[len(trip) - 1].duration
+
+    @staticmethod
     def filter_trips(trip):
         """
         Filters all unknown locations from the trip
@@ -66,3 +79,24 @@ class LocationsAnalysis:
             trip (named tuple): The trip without unknown locations
         """
         return list(filter(lambda x: x.building != None, trip))
+
+    @staticmethod
+    def add_in_trips(trip, trip_ins):
+        for visit_index in range(len(trip) - 1):
+            visit = trip[visit_index]
+            count = trip_ins[visit.building]
+            trip_ins[visit.building] = count + 1
+        return trip_ins
+
+    @staticmethod
+    def add_out_trips(trip, trips_out):
+        for visit_index in range(1, len(trip)):
+            visit = trip[visit_index]
+            count = trips_out[visit.building]
+            trips_out[visit.building] = count + 1
+        return trips_out
+    
+    @staticmethod
+    def print_trip(trip):
+        for index, location in zip(range(len(trip)), trip):
+            print("{0}: {1}/n".format(index, location))

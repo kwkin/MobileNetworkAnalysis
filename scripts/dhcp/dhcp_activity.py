@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 from locations import trip_visit as visit
 from locations import building
+from locations import locations_analysis as loc
+from locations import location_writer as locw
+
+from dhcp import dhcp_filters as dhcpf
 
 import calendar
 import datetime as dt
@@ -22,6 +26,7 @@ class DHCPAnalysis:
         self.locations = pd.read_csv(location_file)
         self.earliest_time = self.traces['startTime'].min()
         self.latest_time = self.traces['endTime'].max()
+        self.latest_user = self.traces['userMAC'].max()
     
     def get_num_events(self, minutes):
         return DHCPAnalysis.get_trace_num_events(self.traces, minutes)
@@ -173,12 +178,35 @@ class DHCPAnalysis:
         return trip
 
     @staticmethod
-    def trace_refine_trip(trip, threshold):
+    def trace_refine_trip(trip, threshold, distance_threshold):
+        """
+        Removes all trips where the user is passing through.
+
+        All visits that surpass the provided threshold in terms of its
+        duration and the time to the next place remains.
+
+        TODO: we need to factor in distance in the duration. The time to walk between places are inherently factored in
+        """
+        # TODO add trip distance from google maps
         refined_trip = []
+        location_index = 0
         for location in trip:
-            duration = location.duration
-            if (duration >= threshold):
+            if location_index == 0:
                 refined_trip.append(location)
+            elif location_index >= len(trip) - 1:
+                refined_trip.append(location)
+            else:
+                duration = location.duration
+                time_sense_last = 0
+                this_visit = trip[location_index]
+                next_visit =  trip[location_index + 1]
+                if location_index < len(trip) - 1:
+                    time_sense_last = next_visit.start - this_visit.start
+                time_elapsed = duration + time_sense_last
+                distance = loc.LocationsAnalysis.get_distance(this_visit, next_visit)
+                if time_elapsed >= threshold and distance >= distance_threshold:
+                    refined_trip.append(location)
+            location_index += 1
         return refined_trip
 
     def get_events_per_building(self):
@@ -285,3 +313,36 @@ class DHCPAnalysis:
 
         # Get activity/density between start and stop at the location
         return 0
+    
+    def get_in_trips(self, minutes):
+        minutes = 60
+        seconds = minutes * 60.0
+        num_periods = math.floor((self.latest_time - self.earliest_time) / seconds) + 1
+        bins = range(0, num_periods)
+        num_events = range(len(bins))
+
+        writer = locw.LocationWriter(self.location_file)
+        for time_index in num_events:
+            # Filter the times
+            trip_ins = writer.get_building_dictionary()
+            trip_outs = writer.get_building_dictionary()
+            start_time = self.earliest_time + time_index * seconds
+
+            time_traces = dhcpf.DHCPFilters.filter_time(self.traces, start_time, seconds - 1)
+
+            start_user = time_traces['userMAC'].min()
+            stop_user = time_traces['userMAC'].max()
+
+            # Get the user trips
+            for user_id in range(start_user, stop_user):
+                print("user_id: {0}".format(user_id))
+                trip = self.get_user_trip(user_id)
+                trip = loc.LocationsAnalysis.filter_trips(trip)
+                if (len(trip) > 0):
+                    refined_trip = DHCPAnalysis.trace_refine_trip(trip,  60 * 5, 0.5)
+                    trip_ins = loc.LocationsAnalysis.add_in_trips(refined_trip, trip_ins)
+                    trip_outs = loc.LocationsAnalysis.add_in_trips(refined_trip, trip_outs)
+        
+            writer.add_column('trip_in_{0}'.format(time_index), trip_ins)
+            writer.add_column('trip_out_{0}'.format(time_index), trip_outs)
+            writer.write_file('output_trip.csv')
