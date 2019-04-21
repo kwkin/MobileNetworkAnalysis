@@ -3,6 +3,7 @@ from scipy import stats
 from util import time_util as timeu
 from gmplot.color_dicts import html_color_codes
 
+from .trip_analysis import TripAnalysis
 from .trip_visit import Visit
 from .building import Building
 
@@ -13,9 +14,55 @@ import matplotlib.ticker as ticker
 import pandas as pd
 import gmplot
 import numpy as np
+import ntpath
 import os
 
 class LocationPlot:
+    @staticmethod
+    def plot_total_trips(trip_count, hours):
+        fig, ax = plt.subplots()
+                
+        plt.bar(hours, trip_count, align='edge', width=1)
+        max_value = np.amax(trip_count)
+        ax.set_ylim([0, max_value * 1.15])
+        
+        plt.title('Total Number of Trips between April 07, 2019 to April 13, 2019')
+        plt.ylabel('Number of Events')
+        plt.xlabel('Hour')
+        plt.show()
+
+    @staticmethod
+    def plot_in_out_trips(arrivals, departures, hours):
+        fig, ax = plt.subplots()
+
+        number_hours = range(0, len(hours) - 1)
+        plt.bar(number_hours, arrivals, align='edge', width=1, alpha=0.5)
+        plt.bar(number_hours, departures, align='edge', width=1, alpha=0.5)
+        
+        max_in_value = np.amax(arrivals)
+        max_out_value = np.amax(departures)
+        max_value = max(max_in_value, max_out_value)
+
+        every_other = 12
+        majorLocator = ticker.MultipleLocator(every_other)
+        minorLocator = ticker.MultipleLocator(3)
+        ax.xaxis.set_major_locator(majorLocator)
+        ax.xaxis.set_minor_locator(minorLocator)
+        strings = [0]
+        for index, hour in zip(range(len(hours)), hours):
+            if index % every_other == 0:
+                strings.append(hour)
+        ax.set_xticklabels(strings)
+
+        plt.gcf().subplots_adjust(bottom=0.2)
+        plt.xticks(rotation=70)
+        ax.set_ylim([0, max_value * 1.1])
+        plt.legend(['Arrivals', 'Departures'])
+        plt.title('Total Number of Trips between Saturday April 07, 2012 to Friday April 13, 2012')
+        plt.ylabel('Number of Events')
+        plt.xlabel('Day of Week and Hour')
+        plt.show()
+
     @staticmethod
     def plot_trip(gmap, trip, multi_color=True, scatter=False, marker=True):
         latitudes = [visit.lat for visit in trip]
@@ -142,7 +189,97 @@ class LocationPlot:
         return radii
 
     @staticmethod
-    def generate_heatmap(densities, time_start, time_stop, out_dir="output"):
+    def generate_heatmap(lats, lons, weights, file_name="output"):
+        grid_points = 150
+
+        lon_range = np.ptp(lons)
+        lon_min = lons.min() - lon_range / 3
+        lon_max = lons.max() + lon_range / 3
+        lon_step = lon_range / grid_points
+        lon_center = np.median(lons)
+        lon_midpt = np.mean([lon_min, lon_max])
+
+        lat_range = np.ptp(lats)
+        lat_min = lats.min() - lat_range / 3
+        lat_max = lats.max() + lat_range / 3
+        lat_step = lat_range / grid_points
+        lat_center = np.median(lats)
+        lat_midpt = np.mean([lat_min, lat_max])
+
+        # Generate heatmap values
+        lon_grid, lat_grid = np.mgrid[lon_min:lon_max:lon_step, lat_min:lat_max:lat_step]
+        positions = np.vstack([lon_grid.ravel(), lat_grid.ravel()])
+        values = np.vstack([lons, lats])
+        kernel = stats.gaussian_kde(values, weights=weights)
+        heatmap = np.reshape(kernel(positions), lon_grid.shape)
+
+        # Normalize heatmap over all frames
+        # Create heatmap figure
+        fig = plt.figure(frameon=True)
+        ax = plt.Axes(fig, [0.0, 0.0, 1.0, 1.0])
+        ax.set_aspect('equal')
+        ax.set_axis_off()
+        ax.tick_params(which='both', direction='in')
+        fig.add_axes(ax)
+        ax.imshow(np.rot90(heatmap),cmap='coolwarm', alpha=0.4, extent=[lon_min, lon_max, lat_min, lat_max])
+        extent = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
+
+        heatmap_file = '{0}.png'.format(file_name)
+        fig.savefig(heatmap_file, format='png', dpi=300, transparent=True, bbox_inches=extent, pad_inches=0)
+        heatmap = ntpath.basename(heatmap_file)
+
+        # Overlay on plot
+        img_bounds = {}
+        img_bounds['west'] = (lon_min - lon_midpt) * (grid_points / (grid_points - 1)) + lon_midpt
+        img_bounds['east'] = (lon_max - lon_midpt) * (grid_points / (grid_points - 1)) + lon_midpt
+        img_bounds['north'] = (lat_max - lat_midpt) * (grid_points / (grid_points - 1)) + lat_midpt
+        img_bounds['south'] = (lat_min - lat_midpt) * (grid_points / (grid_points - 1)) + lat_midpt
+
+        gmap = gmplot.GoogleMapPlotter(lat_center, lon_center, zoom=15)
+        gmap.ground_overlay(heatmap, img_bounds)
+        gmap.scatter(lats, lons, '#3B0B39', alpha=0.4, size=20, marker=False)
+            
+        file_name = '{0}.html'.format(file_name)
+        gmap.draw(file_name)
+
+    @staticmethod
+    def generate_activity_heatmap(lats, lons, events, file_name="output"):
+        grid_points = 150
+
+        lon_range = np.ptp(lons)
+        lon_min = lons.min() - lon_range / 3
+        lon_max = lons.max() + lon_range / 3
+        lon_step = lon_range / grid_points
+
+        lat_range = np.ptp(lats)
+        lat_min = lats.min() - lat_range / 3
+        lat_max = lats.max() + lat_range / 3
+        lat_step = lat_range / grid_points
+
+        # Generate heatmap values
+        lon_grid, lat_grid = np.mgrid[lon_min:lon_max:lon_step, lat_min:lat_max:lat_step]
+        positions = np.vstack([lon_grid.ravel(), lat_grid.ravel()])
+        values = np.vstack([lons, lats])
+        kernel = stats.gaussian_kde(values, weights=events)
+        heatmap = np.reshape(kernel(positions), lon_grid.shape)
+
+        # Normalize heatmap over all frames
+        # Create heatmap figure
+        fig = plt.figure(frameon=True)
+        ax = plt.Axes(fig, [0.0, 0.0, 1.0, 1.0])
+        ax.set_aspect('equal')
+        ax.set_axis_off()
+        ax.tick_params(which='both', direction='in')
+        fig.add_axes(ax)
+        ax.imshow(np.rot90(heatmap),cmap='coolwarm', alpha=0.4, extent=[lon_min, lon_max, lat_min, lat_max])
+        extent = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
+
+        file_name = '{0}.png'.format(file_name)
+        fig.savefig(file_name, format='png', dpi=300, transparent=True, bbox_inches=extent, pad_inches=0)
+        plt.close(fig)
+
+    @staticmethod
+    def generate_activity_heatmap_visits(densities, time_start=0, time_stop=0, out_dir="output"):
         grid_points = 150
         lats = np.array([visit.lat for visit in densities])
         lons = np.array([visit.lon for visit in densities])
@@ -183,7 +320,43 @@ class LocationPlot:
         return file_path
 
     @staticmethod
-    def plot_building_heatmap(densities, start, stop, change_radii=True):
+    def plot_building_heatmap(lats, lons, events, file_name='output'):
+        grid_points = 150
+
+        lon_range = np.ptp(lons)
+        lon_min = lons.min() - lon_range / 3
+        lon_max = lons.max() + lon_range / 3
+        lon_step = lon_range / grid_points
+        lon_center = np.median(lons)
+        lon_midpt = np.mean([lon_min, lon_max])
+
+        lat_range = np.ptp(lats)
+        lat_min = lats.min() - lat_range / 3
+        lat_max = lats.max() + lat_range / 3
+        lat_step = lat_range / grid_points
+        lat_center = np.median(lats)
+        lat_midpt = np.mean([lat_min, lat_max])
+
+        LocationPlot.generate_activity_heatmap(lats, lons, events, file_name)
+        heatmap = '{0}.png'.format(file_name)
+        heatmap = ntpath.basename(heatmap)
+
+        # Overlay on plot
+        img_bounds = {}
+        img_bounds['west'] = (lon_min - lon_midpt) * (grid_points / (grid_points - 1)) + lon_midpt
+        img_bounds['east'] = (lon_max - lon_midpt) * (grid_points / (grid_points - 1)) + lon_midpt
+        img_bounds['north'] = (lat_max - lat_midpt) * (grid_points / (grid_points - 1)) + lat_midpt
+        img_bounds['south'] = (lat_min - lat_midpt) * (grid_points / (grid_points - 1)) + lat_midpt
+
+        gmap = gmplot.GoogleMapPlotter(lat_center, lon_center, zoom=15)
+        gmap.ground_overlay(heatmap, img_bounds)
+        gmap.scatter(lats, lons, '#3B0B39', alpha=0.4, size=20, marker=False)
+            
+        file_name = '{0}.html'.format(file_name)
+        gmap.draw(file_name)
+
+    @staticmethod
+    def plot_building_heatmap_visits(densities, start, stop, change_radii=True):
         grid_points = 150
         lats = np.array([visit.lat for visit in densities])
         lons = np.array([visit.lon for visit in densities])
@@ -203,7 +376,7 @@ class LocationPlot:
         lat_center = np.median(lats)
         lat_midpt = np.mean([lat_min, lat_max])
 
-        heatmap = LocationPlot.generate_heatmap(densities, start, stop)
+        heatmap = LocationPlot.generate_activity_heatmap(densities, start, stop)
 
         # Overlay on plot
         img_bounds = {}
@@ -225,11 +398,11 @@ class LocationPlot:
         gmap.draw(file_name)
 
     @staticmethod
-    def create_map_overlay(densities, heatmap, title="map"):
+    def create_map_overlay(lats, lons, heatmap, title="map"):
         grid_points = 150
-        lats = np.array([visit.lat for visit in densities])
-        lons = np.array([visit.lon for visit in densities])
-        events = np.array([visit.density for visit in densities])
+        # lats = np.array([visit.lat for visit in densities])
+        # lons = np.array([visit.lon for visit in densities])
+        # events = np.array([visit.density for visit in densities])
 
         lon_range = np.ptp(lons)
         lon_min = lons.min() - lon_range / 3
@@ -286,11 +459,16 @@ class LocationPlot:
                 ts = ts.tz_localize('UTC')
                 start_time = dt.datetime(ts.year, ts.month, ts.day, ts.hour, ts.minute, ts.second).strftime('%H:%M:%S')
                 time_sense_last = 0
+                distance = 0
                 if (visit_index < len(visits) - 1):
                     time_sense_last = visits[visit_index + 1].start - visits[visit_index].start
+                if (visit_index != 0):
+                    distance = TripAnalysis.get_distance(visits[visit_index - 1], visits[visit_index])
                 title += 'Stop: ' + str(visit_index) + '\\n'
                 title += 'Building: ' + visit.building + '\\n'
                 title += 'Start: ' + str(start_time) + '\\n'
                 title += 'Duration: ' + timeu.display_time(visit.duration) + '\\n'
-                title += 'Time Before Next: ' + timeu.display_time(time_sense_last) + '\\n\\n'
+                title += 'Time Before Next: ' + timeu.display_time(time_sense_last) + '\\n'
+                title += 'Distance: ' + str(distance) + '\\n\\n'
+
             gmap.marker(building.lat, building.lon, color=marker_color, title=title)

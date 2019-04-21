@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 import re
 
@@ -5,6 +6,24 @@ import re
 Contains some common filters for getting data from the dhcp file
 """
 class DHCPFilters:    
+
+    @staticmethod
+    def filter_time_range(traces, start_time, end_time):
+        """
+        Filters out all times not within the provided start time and duration
+
+        The ranges are inclusive.
+
+        :parameters:
+            dhcp_file (pandas dataframe): the dhcp data frame to filter
+            start_time (int): starting epoch time
+            duration (int): duration of the filter time
+        :return:
+            pandas dataframe with times only between the start time and duration
+        """
+        traces = traces.loc[traces['startTime'] >= start_time]
+        traces = traces.loc[traces['startTime'] <= end_time]
+        return traces
 
     @staticmethod
     def filter_time(traces, start_time, duration):
@@ -82,6 +101,32 @@ class DHCPFilters:
                 building_name = 'unknown'
             else:
                 building_name = building['name'].values[0]
+            buildings.append(building_name)
+        traces['building'] = buildings
+        traces.to_csv(file_name, index=None)
+    
+    @staticmethod
+    def write_traces_building_names(traces, location_file, file_name):
+        """
+        Writes the visited building next to the event
+        """
+        locations_data = pd.read_csv(location_file)
+        locations = {}
+        for index, row in locations_data.iterrows():
+            locations[row['prefix']] = row
+        locations['unknown'] = np.array([])
+
+        buildings = []
+        for index, row in traces.iterrows():
+            prefix = re.findall('[a-zA-Z]+', row['APNAME'])[0]
+            try:
+                building = locations[prefix]
+                if (building.size == 0):
+                    building_name = 'unknown'
+                else:
+                    building_name = building['name']
+            except:
+                building_name = 'unknown'
             buildings.append(building_name)
         traces['building'] = buildings
         traces.to_csv(file_name, index=None)

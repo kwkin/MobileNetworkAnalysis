@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from locations import trip_visit as visit
 from locations import building
-from locations import locations_analysis as loc
+from locations import trip_analysis as loc
 from locations import location_writer as locw
 
 from dhcp import dhcp_filters as dhcpf
@@ -23,7 +23,13 @@ class DHCPAnalysis:
         self.dhcp_file = dhcp_file
         self.location_file = location_file
         self.traces = pd.read_csv(dhcp_file)
-        self.locations = pd.read_csv(location_file)
+
+        locations = pd.read_csv(location_file)
+        self.locations = {}
+        for index, row in locations.iterrows():
+            self.locations[row['name']] = row
+        self.locations['unknown'] = np.array([])
+
         self.earliest_time = self.traces['startTime'].min()
         self.latest_time = self.traces['endTime'].max()
         self.latest_user = self.traces['userMAC'].max()
@@ -56,7 +62,7 @@ class DHCPAnalysis:
         return num_events, bins
 
     def get_user_buildings(self, user_id):
-        return DHCPAnalysis.get_trace_user_buildings(self.traces, self.locations, user_id)
+        return DHCPAnalysis.get_trace_user_buildings(self.traces, self.locations_dict, user_id)
 
     @staticmethod
     def get_trace_user_buildings(traces, locations, user_id):
@@ -69,8 +75,7 @@ class DHCPAnalysis:
         user_traces = traces.loc[traces['userMAC'] == user_id]
         visited_buildings = {}
         for index, row in user_traces.iterrows():
-            prefix = re.findall('[a-zA-Z]+', row['APNAME'])[0]
-            building = locations.loc[locations['prefix'] == prefix]
+            building = locations.loc[locations['prefix'] == row['building']]
             timespent = row['endTime'] - row['startTime']
             if (building.size == 0):
                 building_name = 'unknown'
@@ -98,8 +103,7 @@ class DHCPAnalysis:
         access_points = user_traces['APNAME'].unique()
         visited_buildings = set()
         for access_point in access_points:
-            prefix = re.findall('[a-zA-Z]+', access_point)[0]
-            building = locations.loc[locations['prefix'] == prefix]
+            building = locations.loc[locations['prefix'] == row['building']]
             if (building.size == 0):
                 visited_buildings.add('unknown')
             else:
@@ -120,8 +124,7 @@ class DHCPAnalysis:
         user_traces = dhcpf.filter_user(traces, user_id)
         visited_categories = {}
         for index, row in user_traces.iterrows():
-            prefix = re.findall('[a-zA-Z]+', row['APNAME'])[0]
-            building = locations.loc[locations['prefix'] == prefix]
+            building = locations.loc[locations['prefix'] == row['building']]
             timespent = row['endTime'] - row['startTime']
             if (building.size == 0):
                 visited_categories['unknown'] += timespent
@@ -150,31 +153,27 @@ class DHCPAnalysis:
         current_duration = 0
         start_time = 0
         for index, row in user_traces.iterrows():
-            prefix = re.findall('[a-zA-Z]+', row['APNAME'])[0]
-            location = locations.loc[locations['prefix'] == prefix]
-            if (location.size > 0):
-                building = location['name'].values[0]
-            else:
-                building = None
-
-            if (index == user_traces.values.size - 1):
-                trip.append(visit.Visit(building=previous_building, lat=previous_lat, lon=previous_lon, start=start_time, duration=current_duration))
-            elif (previous_building != building):
-                # Add visit as a new location if it does not match previous prefix
-                previous_building = building
-                if (location.size > 0):
-                    previous_lat = location['lat'].values[0]
-                    previous_lon = location['lon'].values[0]
+            location = locations[row['building']]
+            if location.size > 0:
+                building = location['name']
+                if (index == user_traces.values.size - 1):
+                    trip.append(visit.Visit(building=previous_building, lat=previous_lat, lon=previous_lon, start=start_time, duration=current_duration))
+                elif (previous_building != building):
+                    # Add visit as a new location if it does not match previous prefix
+                    previous_building = building
+                    if (location.size > 0):
+                        previous_lat = location['lat']
+                        previous_lon = location['lon']
+                    else:
+                        previous_lat = None
+                        previous_lon = None
+                    start_time = row['startTime']
+                    current_duration = row['endTime'] - start_time
+                    trip.append(visit.Visit(building=previous_building, lat=previous_lat, lon=previous_lon, start=start_time, duration=current_duration))
                 else:
-                    previous_lat = None
-                    previous_lon = None
-                start_time = row['startTime']
-                current_duration = row['endTime'] - start_time
-                trip.append(visit.Visit(building=previous_building, lat=previous_lat, lon=previous_lon, start=start_time, duration=current_duration))
-            else:
-                # Add to the previous visit duration if it matches previous prefix
-                timespent = row['endTime'] - row['startTime']
-                current_duration += timespent
+                    # Add to the previous visit duration if it matches previous prefix
+                    timespent = row['endTime'] - row['startTime']
+                    current_duration += timespent
         return trip
 
     @staticmethod
@@ -203,8 +202,8 @@ class DHCPAnalysis:
                 if location_index < len(trip) - 1:
                     time_sense_last = next_visit.start - this_visit.start
                 time_elapsed = duration + time_sense_last
-                distance = loc.LocationsAnalysis.get_distance(this_visit, next_visit)
-                if time_elapsed >= threshold and distance >= distance_threshold:
+                distance = loc.TripAnalysis.get_distance(this_visit, next_visit)
+                if time_elapsed >= threshold or distance >= distance_threshold:
                     refined_trip.append(location)
             location_index += 1
         return refined_trip
@@ -224,7 +223,7 @@ class DHCPAnalysis:
         
         for index, row in self.traces.iterrows():
             prefix = re.findall('[a-zA-Z]+', row['APNAME'])[0]
-            building = self.locations.loc[self.locations['prefix'] == prefix]
+            building = self.locations[self.locations['prefix'] == prefix]
             if (building.size == 0):
                 building = 'unknown'
             else:
@@ -314,35 +313,33 @@ class DHCPAnalysis:
         # Get activity/density between start and stop at the location
         return 0
     
-    def get_in_trips(self, minutes):
+    def get_in_trips(self, output_file):
         minutes = 60
         seconds = minutes * 60.0
         num_periods = math.floor((self.latest_time - self.earliest_time) / seconds) + 1
         bins = range(0, num_periods)
-        num_events = range(len(bins))
 
         writer = locw.LocationWriter(self.location_file)
-        for time_index in num_events:
+        for time_index in range(1, len(bins)):
             # Filter the times
             trip_ins = writer.get_building_dictionary()
             trip_outs = writer.get_building_dictionary()
             start_time = self.earliest_time + time_index * seconds
 
             time_traces = dhcpf.DHCPFilters.filter_time(self.traces, start_time, seconds - 1)
+            users = time_traces['userMAC'].unique()
 
-            start_user = time_traces['userMAC'].min()
-            stop_user = time_traces['userMAC'].max()
+            print("index: {0}  num_users: {1}  row_count: {2}".format(time_index, len(users), len(time_traces.index)))
 
             # Get the user trips
-            for user_id in range(start_user, stop_user):
-                print("user_id: {0}".format(user_id))
-                trip = self.get_user_trip(user_id)
+            for user_id in users:
+                trip = DHCPAnalysis.get_trace_user_trip(time_traces, self.locations, user_id)
                 trip = loc.LocationsAnalysis.filter_trips(trip)
                 if (len(trip) > 0):
                     refined_trip = DHCPAnalysis.trace_refine_trip(trip,  60 * 5, 0.5)
                     trip_ins = loc.LocationsAnalysis.add_in_trips(refined_trip, trip_ins)
-                    trip_outs = loc.LocationsAnalysis.add_in_trips(refined_trip, trip_outs)
+                    trip_outs = loc.LocationsAnalysis.add_out_trips(refined_trip, trip_outs)
         
-            writer.add_column('trip_in_{0}'.format(time_index), trip_ins)
-            writer.add_column('trip_out_{0}'.format(time_index), trip_outs)
-            writer.write_file('output_trip.csv')
+            writer.add_column('in_h{0}'.format(time_index), trip_ins)
+            writer.add_column('out_h{0}'.format(time_index), trip_outs)
+            writer.write_file(output_file)

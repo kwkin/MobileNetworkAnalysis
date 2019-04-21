@@ -1,7 +1,7 @@
 import operator
 import geopy.distance
 
-class LocationsAnalysis:
+class TripAnalysis:
 
     @staticmethod
     def get_favorite(keys_and_times):
