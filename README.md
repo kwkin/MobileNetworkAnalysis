@@ -1,5 +1,5 @@
 # DHCP_static_analysis
-Some scripts used to analyze and visualize DHCP logs and pedestrian traffic on a university campus. Additional scripts are added to present expiremental measurements of bluetooth RSSI. The plots are created using Matplotlib. 
+Some scripts used to analyze and visualize DHCP logs and pedestrian traffic on a university campus. Additional scripts are added to present expiremental measurements of bluetooth RSSI. The plots are created using python's matplotlib. 
 
 ## Sample Plots
 The following contains a subset of generated plots.
